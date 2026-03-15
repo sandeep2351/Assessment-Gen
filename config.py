@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+OPEROUTER_GEMINI_API_KEY = os.getenv("OPEROUTER_GEMINI_API_KEY", "")
 MONGODB_URI = os.getenv("MONGODB_URI", "")
 ASSESSMENT_SERVICE_TOKEN = os.getenv("ASSESSMENT_SERVICE_TOKEN", "")
 
