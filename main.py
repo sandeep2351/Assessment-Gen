@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
 
 from config import ASSESSMENT_SERVICE_TOKEN
-from routers import plan, questions, parse
+from routers import plan, questions, parse, optimize, single_question
 
 logging.basicConfig(
     level=logging.INFO,
@@ -36,6 +36,8 @@ app.add_middleware(
 app.include_router(plan.router, prefix="")
 app.include_router(questions.router, prefix="")
 app.include_router(parse.router, prefix="")
+app.include_router(optimize.router, prefix="")
+app.include_router(single_question.router, prefix="")
 
 
 @app.get("/health")

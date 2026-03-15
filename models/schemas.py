@@ -54,3 +54,21 @@ class GenerateQuestionsResponse(BaseModel):
     questions: list[dict[str, Any]]
     suggested_questions: list[dict[str, Any]] = Field(default_factory=list)
     source: str = "resources"  # "resources" | "scraped"
+
+
+class OptimizeQuestionRequest(BaseModel):
+    question: dict[str, Any] = Field(..., description="Single question object (same shape as generate-questions)")
+    prompt_hint: str = Field(..., min_length=1, description="e.g. 'Increase difficulty', 'Add more context from JD'")
+
+
+class OptimizeAllQuestionsRequest(BaseModel):
+    questions: list[dict[str, Any]] = Field(..., description="List of question objects to improve")
+    prompt: str = Field(..., min_length=1, description="Prompt to apply to all questions (e.g. 'Make more code-base oriented')")
+
+
+class GenerateSingleQuestionRequest(BaseModel):
+    section_type: str = Field(..., description="mcq, descriptive, or coding")
+    skill: str = Field(..., min_length=1)
+    difficulty: str = Field(..., description="EASY, MEDIUM, or HARD")
+    prompt: Optional[str] = Field(None, description="Optional hint for AI (e.g. 'Make more code-base oriented')")
+    company_tag: Optional[str] = Field(None, description="Optional company tag for context")

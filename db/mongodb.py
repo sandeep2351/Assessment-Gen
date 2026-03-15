@@ -2,7 +2,12 @@ import logging
 from typing import Any
 
 from pymongo import MongoClient
-from config import MONGODB_URI, ASSESSMENT_DB_NAME, EVENT_RESOURCES_COLLECTION
+from config import (
+    MONGODB_URI,
+    ASSESSMENT_DB_NAME,
+    EVENT_RESOURCES_COLLECTION,
+    MONGODB_TLS_INSECURE,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +22,10 @@ def get_client() -> MongoClient | None:
         return None
     if _client is None:
         try:
-            _client = MongoClient(MONGODB_URI)
+            kwargs: dict[str, Any] = {}
+            if MONGODB_TLS_INSECURE:
+                kwargs["tlsAllowInvalidCertificates"] = True
+            _client = MongoClient(MONGODB_URI, **kwargs)
             _client.admin.command("ping")
         except Exception as e:
             logger.exception("MongoDB connection failed: %s", e)
@@ -30,7 +38,7 @@ def get_db():
     if _db is not None:
         return _db
     client = get_client()
-    if not client:
+    if client is None:
         return None
     _db = client[ASSESSMENT_DB_NAME]
     return _db
@@ -39,7 +47,7 @@ def get_db():
 def get_latest_parsed_for_company(company_tag: str, batch: str | None = None) -> dict[str, Any] | None:
     """Get latest batch parsed content for company. Only uses resources with parsing_status 'completed' (or parsed_content set)."""
     db = get_db()
-    if not db:
+    if db is None:
         return None
     coll = db[EVENT_RESOURCES_COLLECTION]
     query: dict[str, Any] = {"company_tag": company_tag}

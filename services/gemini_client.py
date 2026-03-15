@@ -1,7 +1,9 @@
 import json
 import logging
+import re
 import ssl
 from typing import Any
+
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
@@ -27,8 +29,139 @@ def _check_key():
         raise ValueError("OPEROUTER_GEMINI_API_KEY is not set in .env")
 
 
+def _repair_newlines_in_strings(s: str) -> str:
+    """Replace raw newlines inside double-quoted strings with \\n so JSON parses."""
+    result = []
+    i = 0
+    in_string = False
+    escape = False
+    while i < len(s):
+        c = s[i]
+        if escape:
+            escape = False
+            result.append(c)
+            i += 1
+            continue
+        if in_string:
+            if c == "\\":
+                escape = True
+                result.append(c)
+            elif c == '"':
+                in_string = False
+                result.append(c)
+            elif c in ("\n", "\r"):
+                result.append("\\n")
+            else:
+                result.append(c)
+            i += 1
+            continue
+        if c == '"':
+            in_string = True
+        result.append(c)
+        i += 1
+    return "".join(result)
+
+
+def parse_json_from_text(text: str) -> dict[str, Any] | None:
+    """
+    Try to parse a JSON object from raw model output. Strips markdown, repairs newlines, extracts object.
+    Returns the parsed dict or None if all strategies fail.
+    """
+    if not text or not text.strip():
+        return None
+    text = text.strip()
+    if text.startswith("```"):
+        parts = text.split("```")
+        if len(parts) >= 2:
+            text = parts[1]
+            if text.startswith("json"):
+                text = text[4:]
+            text = text.strip()
+    # Try direct parse
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    try:
+        return json.loads(_repair_newlines_in_strings(text))
+    except json.JSONDecodeError:
+        pass
+    # Extract first complete { ... }
+    start = text.find("{")
+    if start != -1:
+        depth = 0
+        in_string = False
+        escape = False
+        i = start
+        end = start
+        while i < len(text):
+            c = text[i]
+            if escape:
+                escape = False
+                i += 1
+                continue
+            if in_string:
+                if c == "\\":
+                    escape = True
+                elif c == '"':
+                    in_string = False
+                i += 1
+                continue
+            if c == '"':
+                in_string = True
+            elif c == "{":
+                depth += 1
+            elif c == "}":
+                depth -= 1
+                if depth == 0:
+                    end = i + 1
+                    break
+            i += 1
+        if depth == 0 and end > start:
+            subset = text[start:end]
+            try:
+                return json.loads(subset)
+            except json.JSONDecodeError:
+                try:
+                    return json.loads(_repair_newlines_in_strings(subset))
+                except json.JSONDecodeError:
+                    pass
+    return None
+
+
+def generate_raw(prompt: str, json_instruction: str = "Respond with a single valid JSON object only, no markdown.") -> str:
+    """Call OpenRouter and return raw response text (no JSON parsing)."""
+    _check_key()
+    full_prompt = f"{prompt}\n\n{json_instruction}"
+    body = json.dumps({
+        "model": OPENROUTER_MODEL,
+        "messages": [{"role": "user", "content": full_prompt}],
+        "temperature": 0.2,
+    }).encode("utf-8")
+    req = Request(
+        OPENROUTER_URL,
+        data=body,
+        headers={
+            "Authorization": f"Bearer {OPEROUTER_GEMINI_API_KEY.strip()}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://assessment-gen.local",
+        },
+        method="POST",
+    )
+    with urlopen(req, timeout=90, context=_ssl_context()) as resp:
+        data = json.loads(resp.read().decode())
+    choice = (data.get("choices") or [None])[0]
+    if not choice:
+        raise ValueError("Empty choices from OpenRouter")
+    message = choice.get("message") or {}
+    text = (message.get("content") or "").strip()
+    if not text:
+        raise ValueError("Empty response from Gemini via OpenRouter")
+    return text
+
+
 def generate_structured(prompt: str, response_schema: dict[str, Any]) -> dict[str, Any]:
-    """Call Gemini via OpenRouter and parse JSON from response. Schema is for documentation; we ask for JSON in prompt."""
+    """Call Gemini via OpenRouter and parse JSON from response."""
     _check_key()
     full_prompt = (
         f"{prompt}\n\n"
@@ -72,8 +205,8 @@ def generate_structured(prompt: str, response_schema: dict[str, Any]) -> dict[st
         if text.startswith("json"):
             text = text[4:]
         text = text.strip()
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError as e:
-        logger.exception("Gemini response was not valid JSON: %s", e)
-        raise ValueError("AI returned invalid JSON") from e
+    obj = parse_json_from_text(text)
+    if obj is not None:
+        return obj
+    logger.exception("Gemini response was not valid JSON")
+    raise ValueError("AI returned invalid JSON")
