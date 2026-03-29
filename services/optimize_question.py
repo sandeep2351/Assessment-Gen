@@ -15,6 +15,7 @@ RULES:
 - For CODING: keep title, description, test_cases, language.
 - For DESCRIPTIVE/INTERVIEW: keep evaluation_criteria, sample_answer.
 - Apply the user's hint to improve the content (e.g. increase difficulty = harder wording or options; add context = weave in job-relevant details).
+- Do not stuff an employer or company name into the stem unless the user hint explicitly asks for it. Prefer neutral, skill-based wording.
 - Do not add or remove questions; return exactly one question object."""
 
 OPTIMIZE_ALL_SYSTEM = """You are an expert assessment question editor. You will receive an array of assessment questions (JSON) and a user prompt. Your task is to return an array of improved questions, applying the prompt to each question while preserving types, order, and count.
@@ -24,6 +25,7 @@ RULES:
 - The output "questions" array MUST have the exact same length and order as the input.
 - For each question, preserve type, skill, difficulty, and structure (choice_1..4 + correct_choice for MCQ; title/description/test_cases for CODING; evaluation_criteria/sample_answer for DESCRIPTIVE).
 - Apply the user prompt consistently across all questions (e.g. "make more code-base oriented" = add code/implementation angle where relevant).
+- Unless the user prompt explicitly demands it, remove repetitive employer/company naming from stems and use neutral, educational assessment wording.
 - Do not add or remove questions; do not reorder."""
 
 

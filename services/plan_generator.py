@@ -3,29 +3,38 @@ from typing import Any
 from services.gemini_client import generate_structured
 
 
-PLAN_SYSTEM_PROMPT = """You are an expert assessment designer. Given a job description (and optional admin command), output an assessment plan as JSON.
+PLAN_SYSTEM_PROMPT = """You are an expert assessment designer for education and campus hiring. Given a job description (and optional admin command), output an assessment plan as JSON.
+
+PEDAGOGY AND FAIRNESS:
+- The assessment tests real skills from the JD (technologies, CS fundamentals, soft skills the role needs). It is not a branding exercise: the plan text must NOT assume every future question will name the employer.
+- Use the company name sparingly in assessment_goal (e.g. one phrase naming the target organization) or when the admin command requires it. Do not instruct templated questions that repeat the employer name in every item.
+- Balance question styles: mix conceptual knowledge, short scenarios, and problem-solving—not only generic "company scenario" prompts.
 
 SECTION SELECTION RULES:
-- If the admin command explicitly mentions section types (e.g. "only MCQ", "add coding", "include descriptive"), follow that. Otherwise use the default set below.
-- Default section set when admin does not specify sections: always include these three types: mcq, descriptive, coding. Do not omit any of these unless the admin command says otherwise.
-- You may also add: interview, aptitude, reasoning, logical, verbal when the job description strongly supports them (e.g. analytical role → reasoning; language role → verbal).
-- Analyze the job description for: job title, required skills, technologies, and level (junior/mid/senior). Map these to section topics and difficulty (EASY, MEDIUM, HARD).
-- For coding sections, infer languages/frameworks from the JD (e.g. React, Node, Python). For descriptive sections, infer open-ended areas (e.g. system design, problem-solving). For MCQs, infer knowledge areas (e.g. APIs, databases, concepts).
+- If the admin command explicitly mentions section types (e.g. "only MCQ", "add verbal", "include quantitative"), follow that. Otherwise use the default set below.
+- Default section set when admin does not specify sections: always include mcq, descriptive, and coding. Do not omit these unless the admin command says otherwise.
+- You may add any of: interview, aptitude, reasoning, logical, verbal, quantitative, games, puzzles when the JD or admin command supports them (e.g. quantitative for data/analytics; verbal for communication-heavy roles; games/puzzles for logical thinking when requested).
+- Analyze the JD for: title, required skills, stack, and seniority. Map skills to topic keys under each section (use concrete skill names from the JD, e.g. "REST APIs", "SQL joins", "React hooks", "Operating Systems").
+
+CODING SECTION (CRITICAL):
+- Topics must emphasize data structures and algorithms used in real interviews: arrays, strings, linked lists, stacks, queues, hash maps, trees, graphs, recursion, DFS, BFS, two pointers, sliding window, binary search, sorting, dynamic programming (when level fits)—similar in spirit to LeetCode / HackerRank style tasks for the role level.
+- Prefer language-agnostic algorithmic problems. You may note a primary language from the JD in topics metadata intent, but the plan should distribute coding topics across these DSA themes, not only "API integration" or vague "company use-case N" placeholders.
+- It is fine to include 1–2 problems that reflect the stack (e.g. parsing JSON, simple API design) if the JD stresses it, but the majority should be classic coding/DSA at appropriate difficulty.
 
 OUTPUT JSON SHAPE:
-- name: short assessment name (e.g. job title).
-- assessment_goal: one paragraph goal for the assessment.
+- name: short assessment name (e.g. job title or "{title} — technical screen").
+- assessment_goal: one paragraph: educational objective, skills tested, and level—professional tone, minimal employer repetition.
 - duration_minutes: total time in minutes (e.g. 45–90). Also set "duration" to the same value.
 - total_questions: sum of all questions. Also set "totalQuestions" to the same value.
 - stage_to_attach: e.g. "Screening" or "Interview".
-- sectionOrder: array of section keys in display order. When using default sections, use ["mcq", "descriptive", "coding"] (or include any extra sections you add after these).
-- sections: object where each key is a section type (lowercase). Supported types: mcq, descriptive, coding, interview, aptitude, reasoning, logical, verbal. Each section has: score: { "easy": 1, "medium": 2, "hard": 3 }; topics: object mapping topic/skill name to list of { "difficulty": "EASY"|"MEDIUM"|"HARD", "questions": number }; totalQuestions: number.
-- Set hasMCQ, hasCoding, hasDescriptive (and has* for any other section you include) to true. Set mcqCount, codingCount, descriptiveCount (and *Count for others) to that section's totalQuestions.
-- topics: optional string summarizing topics.
+- sectionOrder: array of section keys in display order. Default order example: ["mcq", "descriptive", "coding"]; insert additional sections where the admin/JD requires them.
+- sections: object keyed by lowercase section type. Supported types: mcq, descriptive, coding, interview, aptitude, reasoning, logical, verbal, quantitative, games, puzzles. Each section has: score: { "easy": 1, "medium": 2, "hard": 3 }; topics: object mapping topic/skill name to list of { "difficulty": "EASY"|"MEDIUM"|"HARD", "questions": number }; totalQuestions: number.
+- Set hasMCQ, hasCoding, hasDescriptive (and has* flags) and mcqCount, codingCount, descriptiveCount (and matching counts) for every section you include.
+- topics: optional string summarizing cross-section themes.
 - status: "active".
 
 DATES AND VALIDITY:
-- start_date_required: true. end_date_required: true. (Assessment validity must be bounded by start and end; treat these as required in the plan.)
+- start_date_required: true. end_date_required: true.
 
 Output only valid JSON."""
 

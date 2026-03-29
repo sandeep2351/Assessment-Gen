@@ -1,3 +1,4 @@
+import base64
 import json
 import logging
 import re
@@ -157,6 +158,59 @@ def generate_raw(prompt: str, json_instruction: str = "Respond with a single val
     text = (message.get("content") or "").strip()
     if not text:
         raise ValueError("Empty response from Gemini via OpenRouter")
+    return text
+
+
+def describe_image_bytes(content: bytes, mime_type: str) -> str:
+    """
+    Use vision model via OpenRouter to describe an image for assessment context
+    (text extraction, diagrams, puzzles). Returns plain text.
+    """
+    _check_key()
+    b64 = base64.standard_b64encode(content).decode("ascii")
+    mt = mime_type if "/" in mime_type else f"image/{mime_type}"
+    data_url = f"data:{mt};base64,{b64}"
+    body = json.dumps({
+        "model": OPENROUTER_MODEL,
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": (
+                            "Describe this image for use in campus placement assessments. "
+                            "Extract visible text, numbers, diagrams, puzzle elements, and UI chrome. "
+                            "If it is a chart or table, summarize the data structure. "
+                            "Be concise but complete (max ~800 words)."
+                        ),
+                    },
+                    {"type": "image_url", "image_url": {"url": data_url}},
+                ],
+            }
+        ],
+        "temperature": 0.2,
+        "max_tokens": 2048,
+    }).encode("utf-8")
+    req = Request(
+        OPENROUTER_URL,
+        data=body,
+        headers={
+            "Authorization": f"Bearer {OPEROUTER_GEMINI_API_KEY.strip()}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://assessment-gen.local",
+        },
+        method="POST",
+    )
+    with urlopen(req, timeout=120, context=_ssl_context()) as resp:
+        data = json.loads(resp.read().decode())
+    choice = (data.get("choices") or [None])[0]
+    if not choice:
+        raise ValueError("Empty choices from OpenRouter (vision)")
+    message = choice.get("message") or {}
+    text = (message.get("content") or "").strip()
+    if not text:
+        raise ValueError("Empty vision description from model")
     return text
 
 

@@ -24,9 +24,25 @@ def extract_text_from_docx(content: bytes) -> str:
         return ""
 
 
+IMAGE_EXTENSIONS = frozenset({"png", "jpg", "jpeg", "gif", "webp"})
+
+
+def _mime_for_image_ext(ext: str) -> str:
+    if ext == "jpg":
+        return "image/jpeg"
+    return f"image/{ext}"
+
+
 def parse_file_content(filename: str, content: bytes) -> dict[str, Any]:
     ext = (filename or "").rsplit(".", 1)[-1].lower()
     text = ""
+    if ext in IMAGE_EXTENSIONS:
+        return {
+            "text": "",
+            "filename": filename,
+            "is_image": True,
+            "mime_type": _mime_for_image_ext(ext),
+        }
     if ext == "pdf":
         text = extract_text_from_pdf(content)
     elif ext in ("docx", "doc"):
@@ -36,4 +52,4 @@ def parse_file_content(filename: str, content: bytes) -> dict[str, Any]:
             text = content.decode("utf-8", errors="replace")
         except Exception:
             text = ""
-    return {"text": text, "filename": filename}
+    return {"text": text, "filename": filename, "is_image": False}

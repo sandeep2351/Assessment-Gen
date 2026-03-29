@@ -35,6 +35,10 @@ class GenerateQuestionsRequest(BaseModel):
     batch: Optional[str] = None
     event_id: Optional[str] = None
     options: Optional[dict[str, Any]] = None
+    job_description: Optional[str] = None
+    tech_stack: Optional[list[str]] = None
+    job_title: Optional[str] = None
+    assessment_round: Optional[str] = None
 
 
 class QuestionItem(BaseModel):
